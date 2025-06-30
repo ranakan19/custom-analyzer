@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/http"
 
-	v1 "github.com/ranakan19/custom-analyzer/proto/schema/v1"
+	rpc "buf.build/gen/go/k8sgpt-ai/k8sgpt/grpc/go/schema/v1/schemav1grpc"
 	"github.com/ranakan19/custom-analyzer/pkg/analyzer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -23,7 +23,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	reflection.Register(grpcServer)
 	aa := analyzer.NewAnalyzer()
-	v1.RegisterCustomAnalyzerServiceServer(grpcServer, aa.Handler)
+	rpc.RegisterCustomAnalyzerServiceServer(grpcServer, aa.Handler)
 	fmt.Printf("ApplicationSet Analyzer server listening on %s\n", address)
 	if err := grpcServer.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fmt.Printf("Server error: %v\n", err)
