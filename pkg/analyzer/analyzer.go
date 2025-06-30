@@ -8,6 +8,7 @@ import (
 	rpc "buf.build/gen/go/k8sgpt-ai/k8sgpt/grpc/go/schema/v1/schemav1grpc"
 	v1 "buf.build/gen/go/k8sgpt-ai/k8sgpt/protocolbuffers/go/schema/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -76,7 +77,12 @@ func (a *Handler) initializeClient() error {
 
 // Run implements the analyzer logic for ApplicationSets
 func (a *Handler) Run(ctx context.Context, req *v1.RunRequest) (*v1.RunResponse, error) {
+	// Add debug logging to help troubleshoot
+	fmt.Printf("ApplicationSet Analyzer: Starting analysis\n")
+	fmt.Printf("ApplicationSet Analyzer: Analyzing all namespaces\n")
+
 	if err := a.initializeClient(); err != nil {
+		fmt.Printf("ApplicationSet Analyzer: Failed to initialize client: %v\n", err)
 		return &v1.RunResponse{
 			Result: &v1.Result{
 				Name:    "applicationset-analyzer",
@@ -87,12 +93,20 @@ func (a *Handler) Run(ctx context.Context, req *v1.RunRequest) (*v1.RunResponse,
 					},
 				},
 			},
-		}, err
+		}, nil // Return nil error here - the error details are in the response
 	}
 
-	// List all ApplicationSets across all namespaces
-	applicationSets, err := a.dynamicClient.Resource(applicationSetGVR).List(ctx, metav1.ListOptions{})
+	fmt.Printf("ApplicationSet Analyzer: Successfully initialized Kubernetes client\n")
+
+	// List ApplicationSets (either all namespaces or specific namespace)
+	var applicationSets *unstructured.UnstructuredList
+	var err error
+
+	fmt.Printf("ApplicationSet Analyzer: Listing ApplicationSets in all namespaces\n")
+	applicationSets, err = a.dynamicClient.Resource(applicationSetGVR).List(ctx, metav1.ListOptions{})
+
 	if err != nil {
+		fmt.Printf("ApplicationSet Analyzer: Error listing ApplicationSets: %v\n", err)
 		return &v1.RunResponse{
 			Result: &v1.Result{
 				Name:    "applicationset-analyzer",
@@ -103,15 +117,22 @@ func (a *Handler) Run(ctx context.Context, req *v1.RunRequest) (*v1.RunResponse,
 					},
 				},
 			},
-		}, err
+		}, nil // Return nil error here - the error details are in the response
 	}
 
+	fmt.Printf("ApplicationSet Analyzer: Found %d ApplicationSets\n", len(applicationSets.Items))
+
 	if len(applicationSets.Items) == 0 {
+		scopeMsg := "in the cluster"
 		return &v1.RunResponse{
 			Result: &v1.Result{
 				Name:    "applicationset-analyzer",
-				Details: "No ApplicationSets found in the cluster",
-				Error:   []*v1.ErrorDetail{},
+				Details: fmt.Sprintf("No ApplicationSets found %s", scopeMsg),
+				Error: []*v1.ErrorDetail{
+					{
+						Text: fmt.Sprintf("No ApplicationSets found %s", scopeMsg),
+					},
+				},
 			},
 		}, nil
 	}
@@ -119,7 +140,8 @@ func (a *Handler) Run(ctx context.Context, req *v1.RunRequest) (*v1.RunResponse,
 	var errors []*v1.ErrorDetail
 	var details []string
 
-	details = append(details, fmt.Sprintf("Found %d ApplicationSet(s) in the cluster", len(applicationSets.Items)))
+	scopeMsg := "in the cluster"
+	details = append(details, fmt.Sprintf("Found %d ApplicationSet(s) %s", len(applicationSets.Items), scopeMsg))
 
 	// Analyze each ApplicationSet
 	for _, appSet := range applicationSets.Items {

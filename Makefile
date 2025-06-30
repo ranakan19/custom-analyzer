@@ -2,7 +2,7 @@
 
 # Build the analyzer binary
 build:
-	go build -o bin/custom-analyzer main.go
+	go build -o bin/applicationset-analyzer main.go
 
 # Run tests
 test:
